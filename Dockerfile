@@ -1,6 +1,8 @@
 FROM ubuntu:22.04
 
-# Установим Python и необходимые зависимости
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Установка зависимостей
 RUN apt-get update && \
     apt-get install -y \
         python3 \
@@ -24,11 +26,14 @@ RUN apt-get update && \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Обновим pip и поставим Python-зависимости
 RUN pip3 install --upgrade pip setuptools wheel \
     && pip3 install buildozer==1.5.0 Cython kivy
 
-WORKDIR /app
-COPY . /app
+# Создаем непривилегированного пользователя
+RUN useradd -ms /bin/bash builduser
+USER builduser
+WORKDIR /home/builduser/app
 
-CMD ["buildozer", "--version"]
+COPY . /home/builduser/app
+
+CMD ["buildozer", "android", "debug", "--verbose"]
