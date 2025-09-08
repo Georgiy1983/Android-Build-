@@ -1,8 +1,8 @@
-name: Build APK with Custom Docker
+name: Build Kivy APK - Fixed Non-Interactive
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -13,37 +13,50 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Build using custom Docker image
+    - name: Build with auto-confirm
       run: |
-        # Создаем Dockerfile на лету
-        cat > Dockerfile << 'EOF'
-        FROM ubuntu:22.04
-        
-        # Установка зависимостей
-        RUN apt-get update && apt-get install -y \
-            python3 python3-pip python3-venv git zip unzip \
-            openjdk-17-jdk autoconf automake libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
-            cmake libffi-dev libssl-dev libjpeg-dev libpng-dev
-        
-        # Установка Buildozer и Kivy
-        RUN pip3 install buildozer kivy cython
-        
-        WORKDIR /src
-        EOF
-        
-        # Собираем и запускаем
-        docker build -t buildozer-image .
         docker run --rm \
           -v "$PWD":/src \
-          buildozer-image \
+          -w /src \
+          python:3.9-slim-bullseye \
           sh -c "
-            buildozer init || true &&
-            buildozer -v android debug
+            # Устанавливаем зависимости
+            apt-get update
+            apt-get install -y \
+              git zip unzip openjdk-17-jdk \
+              autoconf automake libtool pkg-config \
+              zlib1g-dev libncurses5-dev libncursesw5-dev \
+              libtinfo5 cmake libffi-dev libssl-dev \
+              python3-dev libjpeg-dev libpng-dev
+            
+            # Устанавливаем Python пакеты
+            pip install buildozer kivy cython
+            
+            # Автоматически подтверждаем все запросы
+            echo 'y' | buildozer init 2>/dev/null || true
+            
+            # Собираем без интерактивности
+            buildozer -v android debug --non-interactive
           "
 
-    - name: Upload APK
+    - name: Check build results
+      run: |
+        echo "=== BUILD RESULTS ==="
+        ls -la bin/ 2>/dev/null || echo "No bin directory"
+        find . -name "*.apk" 2>/dev/null | head -5 || echo "No APK files found"
+
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: android-app
-        path: bin/*.apk
+        path: |
+          bin/*.apk
+          .buildozer/android/platform/build-*/dists/*/build/outputs/apk/*.apk
+        if-no-files-found: ignore
+
+    - name: Upload logs for debugging
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: .buildozer
