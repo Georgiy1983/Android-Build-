@@ -1,4 +1,4 @@
- name: Build Kivy APK - Fixed Dependencies
+name: Build Kivy APK - Fixed Dependencies
 
 on:
   push:
