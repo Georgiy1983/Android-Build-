@@ -1,13 +1,12 @@
 FROM python:3.10-slim
 
-# Установка системных зависимостей
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
         build-essential \
         git \
         zip \
         unzip \
-        openjdk-17-jdk \
+        openjdk-11-jdk \
         python3-pip \
         python3-setuptools \
         libffi-dev \
@@ -21,15 +20,13 @@ RUN apt-get update && \
         libncurses5-dev \
         libstdc++6 \
         wget \
-    && apt-get clean
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Установка buildozer
 RUN pip install --upgrade pip setuptools wheel \
     && pip install buildozer==1.5.0 Cython kivy
 
-# Добавить исходники
 WORKDIR /app
 COPY . /app
 
-# По умолчанию запуск buildozer
 CMD ["buildozer", "--version"]
