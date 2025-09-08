@@ -1,12 +1,12 @@
-FROM python:3.10-slim
+FROM python:3.10
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get install -y \
         build-essential \
         git \
         zip \
         unzip \
-        openjdk-8-jdk \
+        openjdk-11-jdk \
         python3-pip \
         python3-setuptools \
         libffi-dev \
