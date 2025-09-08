@@ -1,4 +1,4 @@
-name: Build Kivy APK - Fixed Non-Interactive
+name: Build Kivy APK with Docker
 
 on:
   push:
@@ -13,50 +13,27 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Build with auto-confirm
+    - name: Build with Docker non-interactive
       run: |
         docker run --rm \
           -v "$PWD":/src \
           -w /src \
           python:3.9-slim-bullseye \
           sh -c "
-            # Устанавливаем зависимости
-            apt-get update
+            apt-get update && \
             apt-get install -y \
               git zip unzip openjdk-17-jdk \
               autoconf automake libtool pkg-config \
-              zlib1g-dev libncurses5-dev libncursesw5-dev \
-              libtinfo5 cmake libffi-dev libssl-dev \
-              python3-dev libjpeg-dev libpng-dev
-            
-            # Устанавливаем Python пакеты
-            pip install buildozer kivy cython
-            
-            # Автоматически подтверждаем все запросы
-            echo 'y' | buildozer init 2>/dev/null || true
-            
-            # Собираем без интерактивности
+              zlib1g-dev libncurses5-dev libtinfo5 \
+              cmake libffi-dev libssl-dev && \
+            pip install buildozer kivy cython && \
+            buildozer init || true && \
             buildozer -v android debug --non-interactive
           "
 
-    - name: Check build results
-      run: |
-        echo "=== BUILD RESULTS ==="
-        ls -la bin/ 2>/dev/null || echo "No bin directory"
-        find . -name "*.apk" 2>/dev/null | head -5 || echo "No APK files found"
-
-    - name: Upload APK artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: android-app
-        path: |
-          bin/*.apk
-          .buildozer/android/platform/build-*/dists/*/build/outputs/apk/*.apk
-        if-no-files-found: ignore
-
-    - name: Upload logs for debugging
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-logs
-        path: .buildozer
+        name: kivy-apk
+        path: bin/*.apk
+        if-no-files-found: warn
