@@ -1,110 +1,78 @@
-name: Build Kivy APK - Fixed Dependencies
+name: Build Kivy APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Явно указываем версию Ubuntu
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.9
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
 
-    - name: Install essential build dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          software-properties-common \
-          build-essential \
           git \
           zip \
           unzip \
-          curl \
-          wget
-
-    - name: Install Java JDK 17
-      run: |
-        sudo apt-get install -y openjdk-17-jdk
-        echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture)" >> $GITHUB_ENV
-
-    - name: Install Android build dependencies
-      run: |
-        sudo apt-get install -y \
+          openjdk-17-jdk \
           autoconf \
           automake \
           libtool \
           pkg-config \
-          cmake \
-          ninja-build \
           zlib1g-dev \
           libncurses5-dev \
           libncursesw5-dev \
-          libtinfo6 \          # Правильное имя пакета
+          libtinfo6 \          # ЗДЕСЬ ИСПРАВЛЕНИЕ!
+          cmake \
           libffi-dev \
           libssl-dev \
+          python3-dev \
           libjpeg-dev \
-          libpng-dev \
-          libsqlite3-dev \
-          libreadline-dev
+          libpng-dev
 
     - name: Install Python dependencies
       run: |
-        python -m pip install --upgrade pip wheel setuptools
+        python -m pip install --upgrade pip
         pip install cython==0.29.33
         pip install buildozer
         pip install kivy
 
-    - name: Create minimal buildozer.spec if not exists
+    - name: Initialize Buildozer
       run: |
-        if [ ! -f buildozer.spec ]; then
-          echo "[app]
-title = My Kivy App
-package.name = myapp
-package.domain = org.test
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas
-version = 1.0
-requirements = python3,kivy
-orientation = portrait" > buildozer.spec
-        fi
+        buildozer init || true
 
-    - name: Build APK with verbose output
+    - name: Build APK with Buildozer
       run: |
-        buildozer -v android debug 2>&1 | tee build.log
+        buildozer -v android debug
 
-    - name: Check if APK was created
+    - name: List generated files
       run: |
-        if [ -f bin/*.apk ]; then
-          echo "APK successfully created!"
-          ls -la bin/
-        else
-          echo "APK not found. Checking build directory:"
-          ls -la .buildozer/android/platform/build-*/dists/*/build/outputs/apk/ || true
-          exit 1
-        fi
+        ls -la bin/ || true
+        ls -la .buildozer/ || true
 
     - name: Upload APK artifact
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: android-apk
-        path: |
-          bin/*.apk
-          .buildozer/android/platform/build-*/dists/*/build/outputs/apk/*.apk
+        name: kivy-app-apk
+        path: bin/*.apk
 
-    - name: Upload build logs for debugging
+    - name: Upload build logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: debug-logs
+        name: build-logs
         path: |
-          build.log
           .buildozer
+          buildozer.spec
