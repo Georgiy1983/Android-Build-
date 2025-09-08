@@ -1,0 +1,64 @@
+name: Build Kivy APK with Cache
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache Buildozer dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.buildozer
+          ~/.android
+          ~/.gradle
+        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          ${{ runner.os }}-buildozer-
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git zip unzip openjdk-17-jdk \
+          autoconf automake libtool pkg-config \
+          zlib1g-dev libncurses5-dev libncursesw5-dev \
+          libtinfo5 cmake libffi-dev libssl-dev
+
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install cython==0.29.33 buildozer
+        pip install -r requirements.txt
+
+    - name: Build APK
+      run: |
+        buildozer -v android debug
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-apk
+        path: bin/*.apk
+
+    - name: Upload build logs
+      if: always() # Загружает логи даже при ошибке
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          .buildozer
+          buildozer.spec
