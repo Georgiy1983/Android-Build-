@@ -73,7 +73,7 @@ jobs:
         fi
         
         # Обновляем buildozer.spec с правильными настройками
-        cat > buildozer.spec << EOL
+        cat > buildozer.spec << 'EOL'
 [app]
 title = My Kivy App
 package.name = myapp
@@ -88,8 +88,6 @@ orientation = portrait
 log_level = 2
 
 # Android specific settings
-android.ndk_path = $HOME/.buildozer/android/platform/android-ndk-r23b
-android.sdk_path = $GITHUB_WORKSPACE/android-sdk
 android.ndk = 23b
 android.sdk = 34
 android.build_tools = 34.0.0
@@ -118,14 +116,12 @@ EOL
         fi
 
     - name: Upload APK artifact
-      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: android-apk
         path: bin/*.apk
 
     - name: Upload build logs
-      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: build-logs
