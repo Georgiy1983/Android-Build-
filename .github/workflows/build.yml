@@ -1,4 +1,4 @@
-name: Build Kivy APK
+name: Build Kivy APK - Ubuntu 22.04
 
 on:
   push:
@@ -7,13 +7,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # Используем LTS версию
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
@@ -33,7 +33,7 @@ jobs:
           zlib1g-dev \
           libncurses5-dev \
           libncursesw5-dev \
-          libtinfo6 \          # ЗДЕСЬ ИСПРАВЛЕНИЕ!
+          libtinfo5 \  # В Ubuntu 22.04 еще используется libtinfo5
           cmake \
           libffi-dev \
           libssl-dev \
@@ -48,18 +48,9 @@ jobs:
         pip install buildozer
         pip install kivy
 
-    - name: Initialize Buildozer
-      run: |
-        buildozer init || true
-
     - name: Build APK with Buildozer
       run: |
         buildozer -v android debug
-
-    - name: List generated files
-      run: |
-        ls -la bin/ || true
-        ls -la .buildozer/ || true
 
     - name: Upload APK artifact
       if: success()
@@ -67,12 +58,3 @@ jobs:
       with:
         name: kivy-app-apk
         path: bin/*.apk
-
-    - name: Upload build logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-logs
-        path: |
-          .buildozer
-          buildozer.spec
