@@ -1,4 +1,4 @@
-name: Build Kivy APK - Fixed AIDL
+name: Build Kivy APK - With Debug
 
 on:
   push:
@@ -13,113 +13,84 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Initial debug
+      run: |
+        echo "=== INITIAL DEBUG ==="
+        echo "Workspace: $GITHUB_WORKSPACE"
+        echo "Runner OS: $RUNNER_OS"
+        echo "Python version: $(python --version 2>&1 || echo 'No Python')"
+        echo "Current dir: $(pwd)"
+        ls -la
+
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
 
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          autoconf \
-          automake \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev \
-          python3-dev \
-          libjpeg-dev \
-          libpng-dev
+          git zip unzip openjdk-17-jdk \
+          autoconf automake libtool pkg-config \
+          zlib1g-dev libncurses5-dev libncursesw5-dev \
+          libtinfo5 cmake libffi-dev libssl-dev
 
-    - name: Install Android Command Line Tools
+    - name: Debug Java and Android tools
       run: |
-        # Скачиваем Android Command Line Tools
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        unzip -q commandlinetools-linux-9477386_latest.zip
-        mkdir -p android-sdk/cmdline-tools/latest
-        mv cmdline-tools/* android-sdk/cmdline-tools/latest/
-        rm -rf cmdline-tools commandlinetools-linux-9477386_latest.zip
+        echo "=== JAVA AND ANDROID DEBUG ==="
+        java -version
+        javac -version
+        which aidl || echo "aidl not found - this is the problem!"
         
-        # Устанавливаем необходимые компоненты
-        echo "y" | android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=android-sdk "build-tools;34.0.0"
-        echo "y" | android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=android-sdk "platforms;android-34"
-        echo "y" | android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=android-sdk "platform-tools"
-        
-        # Добавляем в PATH
-        echo "$GITHUB_WORKSPACE/android-sdk/build-tools/34.0.0" >> $GITHUB_PATH
-        echo "$GITHUB_WORKSPACE/android-sdk/platform-tools" >> $GITHUB_PATH
+        # Поиск aidl в системе
+        echo "Searching for aidl:"
+        find /usr -name "aidl" 2>/dev/null || true
+        find /opt -name "aidl" 2>/dev/null || true
+        find ~ -name "aidl" 2>/dev/null || true
 
-    - name: Install Python dependencies
+    - name: Install Python packages
       run: |
-        python -m pip install --upgrade pip
-        pip install cython==0.29.33
-        pip install buildozer
-        pip install kivy
+        pip install buildozer kivy cython
 
-    - name: Create buildozer.spec with correct Android settings
+    - name: Debug Python packages
       run: |
-        if [ ! -f buildozer.spec ]; then
-          buildozer init
-        fi
-        
-        # Обновляем buildozer.spec с правильными настройками
-        cat > buildozer.spec << 'EOL'
-[app]
-title = My Kivy App
-package.name = myapp
-package.domain = org.test
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas
-version = 1.0
-requirements = python3,kivy
-orientation = portrait
+        echo "=== PYTHON PACKAGES DEBUG ==="
+        python -c "import buildozer; print('Buildozer installed')" || echo "Buildozer import failed"
+        python -c "import kivy; print('Kivy version:', kivy.__version__)" || echo "Kivy import failed"
+        buildozer --version || echo "Buildozer command failed"
 
-[buildozer]
-log_level = 2
-
-# Android specific settings
-android.ndk = 23b
-android.sdk = 34
-android.build_tools = 34.0.0
-android.api = 34
-EOL
-
-    - name: Build APK with Buildozer
+    - name: Try to install aidl manually
       run: |
-        # Устанавливаем переменные окружения для Android SDK
-        export ANDROID_SDK_ROOT=$GITHUB_WORKSPACE/android-sdk
-        export ANDROID_NDK_HOME=$HOME/.buildozer/android/platform/android-ndk-r23b
-        export PATH=$ANDROID_SDK_ROOT/build-tools/34.0.0:$ANDROID_SDK_ROOT/platform-tools:$PATH
+        echo "=== MANUAL AIDL INSTALL ==="
+        # Попытка установить aidl
+        sudo apt-get install -y android-sdk-build-tools || \
+        echo "Cannot install android-sdk-build-tools"
         
-        buildozer -v android debug
+        # Поиск альтернативных репозиториев
+        sudo apt-cache search aidl || echo "No aidl packages found"
 
-    - name: Find and upload APK
+    - name: Build APK with timeout
       run: |
-        echo "Searching for APK files..."
-        find . -name "*.apk" -type f | head -10
-        ls -la bin/ || true
-        
-        # Копируем APK если он в нестандартном месте
-        if [ ! -f bin/*.apk ]; then
-          mkdir -p bin
-          find .buildozer -name "*.apk" -exec cp {} bin/ \;
-        fi
+        echo "=== STARTING BUILD ==="
+        timeout 1800 buildozer -v android debug || \
+        echo "Build timed out or failed"
+
+    - name: Find and collect APK files
+      run: |
+        echo "=== FINDING APK FILES ==="
+        find . -name "*.apk" -type f 2>/dev/null | head -10 || echo "No APK files found"
+        ls -la bin/ 2>/dev/null || echo "No bin directory"
+        find .buildozer -name "*.apk" -type f 2>/dev/null | head -5 || echo "No APK in .buildozer"
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: android-apk
-        path: bin/*.apk
+        name: apk-file
+        path: |
+          bin/*.apk
+          .buildozer/android/platform/build-*/dists/*/build/outputs/apk/*.apk
+        if-no-files-found: ignore
 
     - name: Upload build logs
       uses: actions/upload-artifact@v4
@@ -128,3 +99,4 @@ EOL
         path: |
           .buildozer
           buildozer.spec
+        if-no-files-found: ignore
