@@ -6,7 +6,7 @@ RUN apt-get update && \
         git \
         zip \
         unzip \
-        openjdk-11-jdk \
+        openjdk-8-jdk \
         python3-pip \
         python3-setuptools \
         libffi-dev \
